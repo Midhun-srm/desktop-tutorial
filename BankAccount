@@ -31,7 +31,7 @@ class BankAccount {
 public class BankAccountManagement {
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
-        BankAccount acc = new BankAccount("Karthick", 1000);
+        BankAccount acc = new BankAccount("Midhun", 5000);
         int choice;
         do {
             System.out.println("\n1.Deposit\n2.Withdraw\n3.Check Balance\n4.Exit");
