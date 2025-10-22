@@ -1,0 +1,131 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.sql.*;
+import java.time.LocalDate;
+
+public class ExpenseTracker extends JFrame {
+    // GUI components
+    private JTextField descriptionField, amountField;
+    private JButton addButton;
+    private JTable table;
+    private DefaultTableModel model;
+
+    // Database config
+    private static final String DB_URL = "jdbc:postgresql://localhost:5432/postgres";
+    private static final String DB_USER = "postgres";
+    private static final String DB_PASSWORD = "midhun";
+
+    public ExpenseTracker() {
+        setTitle("Expense Tracker");
+        setSize(600, 400);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        // Top panel - Input form
+        JPanel inputPanel = new JPanel(new GridLayout(2, 3, 5, 5));
+        inputPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        inputPanel.add(new JLabel("Description:"));
+        inputPanel.add(new JLabel("Amount:"));
+        inputPanel.add(new JLabel("")); // Empty cell
+
+        descriptionField = new JTextField();
+        amountField = new JTextField();
+        addButton = new JButton("Add Expense");
+
+        inputPanel.add(descriptionField);
+        inputPanel.add(amountField);
+        inputPanel.add(addButton);
+
+        add(inputPanel, BorderLayout.NORTH);
+
+        // Table setup
+        model = new DefaultTableModel(new String[]{"ID", "Description", "Amount", "Date"}, 0);
+        table = new JTable(model);
+        add(new JScrollPane(table), BorderLayout.CENTER);
+
+        // Load existing expenses
+        loadExpenses();
+
+        // Button Action
+        addButton.addActionListener(e -> addExpense());
+    }
+
+    private void addExpense() {
+        String description = descriptionField.getText().trim();
+        String amountText = amountField.getText().trim();
+
+        if (description.isEmpty() || amountText.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please fill in all fields.");
+            return;
+        }
+
+        try {
+            double amount = Double.parseDouble(amountText);
+            LocalDate date = LocalDate.now();
+
+            try (Connection conn = getConnection()) {
+                String sql = "INSERT INTO expenses (description, amount, date) VALUES (?, ?, ?)";
+                PreparedStatement stmt = conn.prepareStatement(sql);
+                stmt.setString(1, description);
+                stmt.setDouble(2, amount);
+                stmt.setDate(3, Date.valueOf(date));
+                stmt.executeUpdate();
+            }
+
+            descriptionField.setText("");
+            amountField.setText("");
+            loadExpenses();
+
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Amount must be a valid number.");
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Database error: " + ex.getMessage());
+            ex.printStackTrace();
+        }
+    }
+
+    private void loadExpenses() {
+        model.setRowCount(0); // Clear table
+
+        try (Connection conn = getConnection()) {
+            String sql = "SELECT * FROM expenses ORDER BY date DESC";
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+
+            while (rs.next()) {
+                int id = rs.getInt("id");
+                String desc = rs.getString("description");
+                double amt = rs.getDouble("amount");
+                Date date = rs.getDate("date");
+
+                model.addRow(new Object[]{id, desc, amt, date});
+            }
+
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Failed to load expenses: " + ex.getMessage());
+            ex.printStackTrace();
+        }
+    }
+
+    private Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+    }
+
+    public static void main(String[] args) {
+        // Load JDBC driver
+        try {
+            Class.forName("org.postgresql.Driver");
+        } catch (ClassNotFoundException ex) {
+            JOptionPane.showMessageDialog(null, "PostgreSQL JDBC Driver not found.");
+            return;
+        }
+
+        SwingUtilities.invokeLater(() -> {
+            new ExpenseTracker().setVisible(true);
+        });
+    }
+}
